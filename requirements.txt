@@ -1,4 +1,3 @@
-openai==1.52.2
 numpy==1.23.5
-pandas
-distutils
+openai==1.54.3
+pandas==2.0.2
