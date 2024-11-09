@@ -76,7 +76,7 @@ if selected_topic:
     template = template_list[selected_index]
     st.subheader(f"{template['prompt']}")
 else:
-    st.subheader(f"{selected_topic}")
+    st.warning("请先在左侧栏中选择作文主题。")
 
 # form to submit the input essay.
 with st.form("input_essay"):
