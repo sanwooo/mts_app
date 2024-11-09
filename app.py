@@ -76,7 +76,7 @@ def count_chinese_sentences(text):
     return len(sentences)
 
 # add title
-st.title("Multi Trait Specialization for Zero-shot Essay Scoring 🤗")
+st.title("基于LLM的作文多维评分系统 🤗")
 
 # predefined list of essay topics with a placeholder option.
 essay_topics = [x['prompt'].split('\n')[0] for x in template_list]
