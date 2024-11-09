@@ -98,6 +98,8 @@ with st.form("input_essay"):
         "作文 (最少3个句子&最少60个字):", height=150, max_chars=500,
     )
     submitted = st.form_submit_button("开始评分")
+    length_verification = st.container()
+    lv_placeholder = length_verification.empty()
 
 if selected_topic:
     col1, col2, col3, col4 = st.columns(4)
@@ -125,11 +127,11 @@ if submitted and selected_topic:
     num_characters = count_chinese_characters(input_essay)
 
     if num_sentences < 3:
-        st.warning("作文的句子数不足 3，请补充更多内容。")
+        lv_placeholder.warning("作文的句子数不足 3，请补充更多内容。")
     elif num_characters < 60:
-        st.warning("作文的字数不足 60，请补充更多内容。")
+        lv_placeholder.warning("作文的字数不足 60，请补充更多内容。")
     else:
-        st.success("作文长度符合要求，开始评分...")
+        lv_placeholder.success("作文长度符合要求，开始评分...")
 
         for trait_idx in [1, 2, 3, 4]:
             # initiate a new conversation for each trait
