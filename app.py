@@ -118,9 +118,9 @@ if selected_topic:
 
     
     container = st.container()
-    container.subheader('整体得分 (1-9 Band)')
+    container.subheader('整体得分 (Band 1-9)')
     final_score_placeholder = container.empty()
-    final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", "- Band", label_visibility='collapsed')
+    final_score_placeholder.metric(f"作文的最终分数 (Band 1-9)", "Band -", label_visibility='collapsed')
 
 if submitted and selected_topic:
     num_sentences = count_chinese_sentences(input_essay)
@@ -192,5 +192,5 @@ if submitted and selected_topic:
         # final_score = score_scaled_target[-1]
 
         final_score = (input_essay_score_agg / 10) * 8 + 1
-        final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed')
+        final_score_placeholder.metric(f"作文的最终分数 (Band 1-9)", f"Band {np.round(final_score).astype(int)}", label_visibility='collapsed')
        
