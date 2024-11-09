@@ -16,7 +16,7 @@ if "openai_model" not in st.session_state:
 # initialize chat history
 if "messages" not in st.session_state:
     st.session_state.trait_messages = []
-    st.session_state.trait_scores = {}
+    st.session_state.trait_scores = {f'trait_{trait_idx}': '-' for trait_idx in [1,2,3,4]}
     np.random.seed(42)
     st.session_state.aggregated_scores = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], size=100, replace=True,\
                                                           p = [0.03, 0.07, 0.10, 0.15, 0.20, 0.10, 0.15, 0.10, 0.05, 0.03, 0.02])
@@ -68,8 +68,8 @@ st.title("Multi Trait Specialization for Zero-shot Essay Scoring 🤗")
 essay_topics = [x['prompt'].split('\n')[0] for x in template_list]
 
 # sidebar for topic selection with radio buttons
-st.sidebar.header("Essay Topic Selection")
-selected_topic = st.sidebar.radio("Select an Essay Topic", essay_topics, index=None)
+st.sidebar.header("主题列表")
+selected_topic = st.sidebar.radio("请选择一个主题。", essay_topics, index=None)
 # render selected topic as the subheader, otherwise render a warning message that requires choosing a topic
 if selected_topic:
     selected_index = essay_topics.index(selected_topic)
@@ -81,11 +81,32 @@ else:
 # form to submit the input essay.
 with st.form("input_essay"):
     input_essay = st.text_area(
-        "Enter text:",
+        "Enter text:", height=100,
     )
     submitted = st.form_submit_button("开始评分")
 
-if submitted:
+if selected_topic:
+    col1, col2, col3, col4 = st.columns(4)
+    # Create placeholders for the metrics
+    col1, col2, col3, col4 = st.columns(4)
+    placeholder1 = col1.empty()
+    placeholder2 = col2.empty()
+    placeholder3 = col3.empty()
+    placeholder4 = col4.empty()
+
+    # Initialize metrics with default values (e.g., '-')
+    placeholder1.metric(f"**{template['trait_1']}**", f"{st.session_state.trait_scores['trait_1']}/10")
+    placeholder2.metric(f"**{template['trait_2']}**", f"{st.session_state.trait_scores['trait_2']}/10")
+    placeholder3.metric(f"**{template['trait_3']}**", f"{st.session_state.trait_scores['trait_3']}/10")
+    placeholder4.metric(f"**{template['trait_4']}**", f"{st.session_state.trait_scores['trait_4']}/10")
+
+    
+    container = st.container()
+    container.subheader('整体得分 (1-9 Band)')
+    final_score_placeholder = container.empty()
+    final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", "- Band", label_visibility='collapsed')
+
+if submitted and selected_topic:
 
     for trait_idx in [1, 2, 3, 4]:
         # initiate a new conversation for each trait
@@ -101,7 +122,7 @@ if submitted:
         msg_assistant_retrieval_stream = generate_assistant_message(st.session_state.trait_messages)
         with st.chat_message("assistant"):
             msg_assistant_retrieval = st.write_stream(msg_assistant_retrieval_stream)
-        update_history(st.session_state.trait_messages, 'system', msg_assistant_retrieval_stream)
+        update_history(st.session_state.trait_messages, 'system', msg_assistant_retrieval)
         # user message score
         msg_user_score = fill_msg_user_score_template(template['msg_user_score_template'], template[f'trait_{trait_idx}'], template[f'rubric_{trait_idx}'])
         with st.chat_message("user"):
@@ -114,13 +135,18 @@ if submitted:
             score = int(re.search(r'(\d+)/10分', msg_assistant_score).groups()[0])
             st.session_state.trait_scores[f'trait_{trait_idx}'] = score
 
-        update_history(st.session_state.trait_messages, 'system', msg_assistant_score_stream)
+            # Update the metric placeholders dynamically
+            if trait_idx == 1:
+                placeholder1.metric(f"**{template['trait_1']}**", f"{st.session_state.trait_scores['trait_1']}/10")
+            elif trait_idx == 2:
+                placeholder2.metric(f"**{template['trait_2']}**", f"{st.session_state.trait_scores['trait_2']}/10")
+            elif trait_idx == 3:
+                placeholder3.metric(f"**{template['trait_3']}**", f"{st.session_state.trait_scores['trait_3']}/10")
+            elif trait_idx == 4:
+                placeholder4.metric(f"**{template['trait_4']}**", f"{st.session_state.trait_scores['trait_4']}/10")
 
-    col1, col2, col3, col4 = st.columns(4) 
-    col1.metric(f"{template['trait_1']}分", st.session_state.trait_scores['trait_1'])       
-    col2.metric(f"{template['trait_2']}分", st.session_state.trait_scores['trait_2'])       
-    col3.metric(f"{template['trait_3']}分", st.session_state.trait_scores['trait_3'])       
-    col4.metric(f"{template['trait_4']}分", st.session_state.trait_scores['trait_4'])
+        update_history(st.session_state.trait_messages, 'system', msg_assistant_score)
+
 
     input_essay_score_agg = np.mean(list(st.session_state.trait_scores.values()))
     # round outliers
@@ -140,7 +166,7 @@ if submitted:
 
     final_score = score_scaled_target[-1]
 
-
-    st.subheader('作文的最终分数 (1-9 Band)')
-    st.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed',\
-              help='Band 表示作文的等级，算法根据和其他作文的比较来确定最终的Band。')
+    final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed')
+    # st.subheader('整体得分 (1-9 Band)')
+    # st.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed',\
+    #           help='Band 表示作文的等级，算法根据和其他作文的比较来确定最终的Band。')
