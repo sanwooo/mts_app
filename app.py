@@ -61,6 +61,20 @@ def update_history(messages: list[dict], role: str, content: str):
     })
     return
 
+def count_chinese_characters(text):
+    """Count the number of Chinese characters in the text."""
+    # chinese_characters = re.findall(r'[\u4e00-\u9fff]', text)
+    # return len(chinese_characters)
+    return len(text)
+
+def count_chinese_sentences(text):
+    """Count the number of sentences in Chinese text."""
+    # Split text by common Chinese sentence delimiters (e.g., 。！？)
+    sentences = re.split(r'[。！？]', text)
+    # Filter out empty sentences
+    sentences = [sentence for sentence in sentences if sentence.strip()]
+    return len(sentences)
+
 # add title
 st.title("Multi Trait Specialization for Zero-shot Essay Scoring 🤗")
 
@@ -81,7 +95,7 @@ else:
 # form to submit the input essay.
 with st.form("input_essay"):
     input_essay = st.text_area(
-        "Enter text:", height=100,
+        "作文 (最少3个句子&最少60个字):", height=150, max_chars=500,
     )
     submitted = st.form_submit_button("开始评分")
 
@@ -107,66 +121,74 @@ if selected_topic:
     final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", "- Band", label_visibility='collapsed')
 
 if submitted and selected_topic:
+    num_sentences = count_chinese_sentences(input_essay)
+    num_characters = count_chinese_characters(input_essay)
 
-    for trait_idx in [1, 2, 3, 4]:
-        # initiate a new conversation for each trait
-        st.session_state.trait_messages = []
-        msg_system = fill_msg_system_template(template['msg_system_template'], template[f'trait_{trait_idx}'])
-        update_history(st.session_state.trait_messages, 'system', msg_system)
-        # user message retrieval
-        msg_user_retrieval = fill_msg_user_retrieval_template(template['msg_user_retrieval_template'], template['prompt'], input_essay, template[f'trait_{trait_idx}'])
-        with st.chat_message("user"):
-            st.write(msg_user_retrieval.split('\n')[-1])
-        update_history(st.session_state.trait_messages, 'system', msg_user_retrieval)
-        # assistant message retrieval
-        msg_assistant_retrieval_stream = generate_assistant_message(st.session_state.trait_messages)
-        with st.chat_message("assistant"):
-            msg_assistant_retrieval = st.write_stream(msg_assistant_retrieval_stream)
-        update_history(st.session_state.trait_messages, 'system', msg_assistant_retrieval)
-        # user message score
-        msg_user_score = fill_msg_user_score_template(template['msg_user_score_template'], template[f'trait_{trait_idx}'], template[f'rubric_{trait_idx}'])
-        with st.chat_message("user"):
-            st.write(msg_user_score)
-        update_history(st.session_state.trait_messages, 'system', msg_user_score)
-        # assistant message score
-        msg_assistant_score_stream = generate_assistant_message(st.session_state.trait_messages)
-        with st.chat_message("assistant"):
-            msg_assistant_score = st.write_stream(msg_assistant_score_stream)
-            score = int(re.search(r'(\d+)/10分', msg_assistant_score).groups()[0])
-            st.session_state.trait_scores[f'trait_{trait_idx}'] = score
+    if num_sentences < 3:
+        st.warning("作文的句子数不足 3，请补充更多内容。")
+    elif num_characters < 60:
+        st.warning("作文的字数不足 60，请补充更多内容。")
+    else:
+        st.success("作文长度符合要求，开始评分...")
 
-            # Update the metric placeholders dynamically
-            if trait_idx == 1:
-                placeholder1.metric(f"**{template['trait_1']}**", f"{st.session_state.trait_scores['trait_1']}/10")
-            elif trait_idx == 2:
-                placeholder2.metric(f"**{template['trait_2']}**", f"{st.session_state.trait_scores['trait_2']}/10")
-            elif trait_idx == 3:
-                placeholder3.metric(f"**{template['trait_3']}**", f"{st.session_state.trait_scores['trait_3']}/10")
-            elif trait_idx == 4:
-                placeholder4.metric(f"**{template['trait_4']}**", f"{st.session_state.trait_scores['trait_4']}/10")
+        for trait_idx in [1, 2, 3, 4]:
+            # initiate a new conversation for each trait
+            st.session_state.trait_messages = []
+            msg_system = fill_msg_system_template(template['msg_system_template'], template[f'trait_{trait_idx}'])
+            update_history(st.session_state.trait_messages, 'system', msg_system)
+            # user message retrieval
+            msg_user_retrieval = fill_msg_user_retrieval_template(template['msg_user_retrieval_template'], template['prompt'], input_essay, template[f'trait_{trait_idx}'])
+            with st.chat_message("user"):
+                st.write(msg_user_retrieval.split('\n')[-1])
+            update_history(st.session_state.trait_messages, 'system', msg_user_retrieval)
+            # assistant message retrieval
+            msg_assistant_retrieval_stream = generate_assistant_message(st.session_state.trait_messages)
+            with st.chat_message("assistant"):
+                msg_assistant_retrieval = st.write_stream(msg_assistant_retrieval_stream)
+            update_history(st.session_state.trait_messages, 'system', msg_assistant_retrieval)
+            # user message score
+            msg_user_score = fill_msg_user_score_template(template['msg_user_score_template'], template[f'trait_{trait_idx}'], template[f'rubric_{trait_idx}'])
+            with st.chat_message("user"):
+                st.write(msg_user_score)
+            update_history(st.session_state.trait_messages, 'system', msg_user_score)
+            # assistant message score
+            msg_assistant_score_stream = generate_assistant_message(st.session_state.trait_messages)
+            with st.chat_message("assistant"):
+                msg_assistant_score = st.write_stream(msg_assistant_score_stream)
+                score = int(re.search(r'(\d+)/10分', msg_assistant_score).groups()[0])
+                st.session_state.trait_scores[f'trait_{trait_idx}'] = score
 
-        update_history(st.session_state.trait_messages, 'system', msg_assistant_score)
+                # Update the metric placeholders dynamically
+                if trait_idx == 1:
+                    placeholder1.metric(f"**{template['trait_1']}**", f"{st.session_state.trait_scores['trait_1']}/10")
+                elif trait_idx == 2:
+                    placeholder2.metric(f"**{template['trait_2']}**", f"{st.session_state.trait_scores['trait_2']}/10")
+                elif trait_idx == 3:
+                    placeholder3.metric(f"**{template['trait_3']}**", f"{st.session_state.trait_scores['trait_3']}/10")
+                elif trait_idx == 4:
+                    placeholder4.metric(f"**{template['trait_4']}**", f"{st.session_state.trait_scores['trait_4']}/10")
+
+            update_history(st.session_state.trait_messages, 'system', msg_assistant_score)
 
 
-    input_essay_score_agg = np.mean(list(st.session_state.trait_scores.values()))
-    # round outliers
-    score_agg = np.array(st.session_state.aggregated_scores.tolist() + [input_essay_score_agg])
+        input_essay_score_agg = np.mean(list(st.session_state.trait_scores.values()))
+        # # round outliers
+        # score_agg = np.array(st.session_state.aggregated_scores.tolist() + [input_essay_score_agg])
 
-    q1 = np.quantile(score_agg, 0.25) 
-    q3 = np.quantile(score_agg, 0.75) 
-    iqr = q3 - q1
-    iqr_width = 1.5
-    score_agg = np.where(score_agg < (q1-iqr*iqr_width), q1-iqr*iqr_width, score_agg)
-    score_agg = np.where(score_agg > (q3+iqr*iqr_width), q3+iqr*iqr_width, score_agg)
+        # q1 = np.quantile(score_agg, 0.25) 
+        # q3 = np.quantile(score_agg, 0.75) 
+        # iqr = q3 - q1
+        # iqr_width = 1.5
+        # score_agg = np.where(score_agg < (q1-iqr*iqr_width), q1-iqr*iqr_width, score_agg)
+        # score_agg = np.where(score_agg > (q3+iqr*iqr_width), q3+iqr*iqr_width, score_agg)
 
-    score_min = 1
-    score_max = 9
-    score_scaled_0_1 = (score_agg - score_agg.min()) / (score_agg.max() - score_agg.min())
-    score_scaled_target = score_scaled_0_1 * (score_max - score_min) + score_min
+        # score_min = 1
+        # score_max = 9
+        # score_scaled_0_1 = (score_agg - score_agg.min()) / (score_agg.max() - score_agg.min())
+        # score_scaled_target = score_scaled_0_1 * (score_max - score_min) + score_min
 
-    final_score = score_scaled_target[-1]
+        # final_score = score_scaled_target[-1]
 
-    final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed')
-    # st.subheader('整体得分 (1-9 Band)')
-    # st.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed',\
-    #           help='Band 表示作文的等级，算法根据和其他作文的比较来确定最终的Band。')
+        final_score = (input_essay_score_agg / 10) * 8 + 1
+        final_score_placeholder.metric(f"作文的最终分数 (1-9 Band)", f"{np.round(final_score).astype(int)} Band", label_visibility='collapsed')
+       
